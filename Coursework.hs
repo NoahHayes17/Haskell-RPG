@@ -1,7 +1,7 @@
-import Data.List (subsequences, permutations, sortOn)
+import Data.List (subsequences, permutations, sortOn, find)
 import Text.Read (readMaybe)
-import Control.Monad (foldM, msum, foldM_)
-import Data.Maybe (isJust, fromMaybe)
+import Control.Monad (foldM, foldM_)
+import Data.Maybe (isJust, fromMaybe, maybeToList, listToMaybe)
 
 ------------------------- Merge sort
 
@@ -60,7 +60,7 @@ setParties (Game m n p _) ps = Game m n p ps
 
 -- Returns all nodes directly connected to a given node.
 connected :: Map -> Node -> [Node]
-connected m n = [x | (x, y) <- m, y == n] ++ [y | (x, y) <- m, x == n]
+connected m n = [if i == n then j else i | (i, j) <- m, i == n || j == n]
 
 -- Creates a connection between two nodes.
 connect :: Node -> Node -> Map -> Map
@@ -127,7 +127,7 @@ numberedPrint ln item = do
     return (ln + 1)
 
 -- Gets and returns user input.
-promptUser :: IO [Char]
+promptUser :: IO String
 promptUser = do
     putStr (prompt ++ " ")
     input <- getLine
@@ -183,9 +183,10 @@ dialogue g (Choice str opts)  = do
 
 -- Returns the dialogue for a given party.
 findDialogue :: Party -> Dialogue
-findDialogue p =
-    fromMaybe defaultDlg $ msum (map (`lookup` theDialogues) (permutations p))
+findDialogue p = fromMaybe defaultDlg dlg
   where
+    dlg        = listToMaybe [ d | perm   <- permutations p 
+                                 , Just d <- [lookup perm theDialogues]]
     defaultDlg = Action line0 id
 
 
@@ -204,17 +205,14 @@ step Over              = return Over
 step g@(Game m n p ps) = do
     putStr line1
     putStrLn (theDescriptions !! n)
-    let dests = [if i == n then j else i
-                | (i, j) <- m
-                , i == n || j == n
-                ]
+    let dests = connected m n
     destCount <- printDestinations dests
     let opts = zip [destCount..] (p ++ (ps !! n))
     nextLine <- printPlayerParty p destCount
     printLocationParty (ps !! n) nextLine
-    
+
     let
-      -- Carries out the corresponding choice (travel or dialogue) for the user input
+      -- Carries out the corresponding choice (travel or dialogue) for the user input.
       handleInput :: IO Game
       handleInput = do
           input <- promptUser
@@ -240,18 +238,21 @@ step g@(Game m n p ps) = do
     handleInput
 
   where
+    -- Prints each travel option prefixed with a line number and returns the next line number.
     printDestinations :: [Node] -> IO Int
     printDestinations []    = return 1
     printDestinations dests = do
         putStrLn line2
         foldM numberedPrint 1 (map (theLocations !!) dests)
 
+    -- Prints each player party member prefixed with a line number and returns the next line number.
     printPlayerParty :: Party -> Int -> IO Int
     printPlayerParty [] destCount = return destCount
     printPlayerParty p destCount  = do
         putStrLn line3
         foldM numberedPrint destCount p
 
+    -- Prints each current location party member prefixed with a line number.
     printLocationParty :: Party -> Int -> IO ()
     printLocationParty [] _       = return ()
     printLocationParty p nextLine = do
@@ -318,14 +319,17 @@ allSteps :: Game -> [(Solution, Game)]
 allSteps g@(Game m n p ps)
     | g == Over = []
     | otherwise =
-      [ ([Travel trvlPath, Select p', Talk dlgPath], g'')
+      [ ([Travel trvlPath, Select p'', Talk dlgPath], g'')
       | (n', trvlPath) <- travel m n
       , let g'          = Game m n' p ps
-      , p'             <- filter validParty (select g')
-      , (g'', dlgPath) <- talk g' (findDialogue p')
+      , p'             <- select g'
+      , p''            <- getValidPermutation p'
+      , (g'', dlgPath) <- talk g' (findDialogue p'')
       ]
   where
-    validParty p = any (isJust . (`lookup` theDialogues)) (permutations p)
+    -- Returns the permutation of the party that exists in theDialogues. 
+    getValidPermutation :: Party -> [Party]
+    getValidPermutation p = maybeToList $ find (isJust . (`lookup` theDialogues)) (permutations p)
 
 -- Returns the choices made to reach Over state via dialogue options (solves the game).
 solve :: Game -> Solution
