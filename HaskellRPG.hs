@@ -185,7 +185,7 @@ dialogue g (Choice str opts)  = do
 findDialogue :: Party -> Dialogue
 findDialogue p = fromMaybe defaultDlg dlg
   where
-    dlg        = listToMaybe [ d | perm   <- permutations p 
+    dlg        = listToMaybe [d | perm   <- permutations p 
                                  , Just d <- [lookup perm theDialogues]]
     defaultDlg = Action line0 id
 
