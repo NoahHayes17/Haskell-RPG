@@ -7,6 +7,6 @@ This exists as a framework, allowing for different worlds to be implemented and 
 ## How to play
 1. Install ghci
 2. Enter "ghci" in the terminal
-3. Enter ":l "HaskellRPG.hs"
+3. Enter ":l HaskellRPG.hs"
 4. The function "game" will allow you to play the game. The game can be played by selecting locations to travel to, a dialogue with one person, and selecting a dialogue between multiple people from the user interface. 
    The function "solve" will solve the game. 
